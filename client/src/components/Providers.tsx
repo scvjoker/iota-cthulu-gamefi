@@ -7,7 +7,7 @@ import { ReactNode, useState } from "react";
 import "@iota/dapp-kit/dist/index.css"; // 引入錢包樣式
 
 const { networkConfig } = createNetworkConfig({
-  testnet: { url: getFullnodeUrl("testnet") },
+  testnet: { url: getFullnodeUrl("testnet") }, 
 });
 
 export function Providers({ children }: { children: ReactNode }) {

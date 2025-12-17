@@ -1,192 +1,144 @@
 # 🐙 Cthulhu Mythos on IOTA: Fully On-Chain TRPG
+## DEMO:🏢IOTA TRPG: Escape the Corporate Abyss (逃離血汗辦公大樓)
 
-> A decentralized Sanity Check game powered by IOTA Move Rebased, leveraging on-chain VRF and Programmable Transaction Blocks (PTB).
+![IOTA](https://img.shields.io/badge/IOTA-Testnet-lightgrey)
+![Move](https://img.shields.io/badge/Smart_Contract-Move-blue)
+![Next.js](https://img.shields.io/badge/Frontend-Next.js-black)
+![License](https://img.shields.io/badge/License-MIT-green)
 
-![Project Banner](https://placehold.co/600x200/1e293b/FFF?text=IOTA+Cthulhu+TRPG)
+> A fully on-chain survival TRPG powered by **IOTA Move Rebased**. Will you escape the infinite overtime, or become part of the building structure forever?
+>
+> 全鏈上生存 TRPG。基於 IOTA 智能合約的無限加班模擬器。你會成功逃脫，還是永遠成為大樓結構的一部分？
 
-## 📖 Introduction
-This project is a Proof-of-Concept for a fully on-chain TRPG (Tabletop Role-Playing Game) built on the IOTA Rebased Testnet. It demonstrates how to utilize **IOTA's `random` module** for fair gameplay and **Batch Transactions** to create intense, high-frequency gaming experiences without user friction.
+---
 
-Players mint an "Investigator" NFT with randomized stats (STR, DEX, SAN) and perform "Sanity Checks" against the Great Old Ones.
+## 📖 Introduction (介紹)
 
-## ✨ Key Features
+**Escape the Corporate Abyss** is a GameFi project built on the IOTA Rebased Testnet. It satirizes corporate culture using a horror TRPG narrative.
 
-### 1. Verifiable On-Chain Randomness (VRF)
-Unlike traditional EVM games that rely on oracle callbacks or insecure block hashes, this project uses IOTA's native `0x8` Random module.
-- **Fair Minting:** Investigator stats are generated atomically on-chain.
-- **Unpredictable Outcomes:** Every Sanity Check is truly random and verifiable.
+Unlike traditional web games, every decision—from "Rushing down stairs" to "Gazing into the Abyss"—is a **real blockchain transaction**. We utilize **IOTA's native `random` module** to ensure every fate is cryptographically fair, and **ScoreEvents** to permanently record the deepest depths reached by players on the chain.
 
-### 2. Batch Transactions (The "Madness" Mode)
-We leverage IOTA's unique architecture to execute **5x Sanity Checks in a single atomic transaction**.
-- **User Experience:** No need to sign 5 separate pop-ups.
-- **Efficiency:** Demonstrates the power of Move's composability and IOTA's high throughput.
+本專案利用 IOTA 的高效能與隨機數模組，打造了一個「社畜逃生」的恐怖遊戲。每一次的抉擇都是一筆鏈上交易，並且所有「鬼打牆」與「精神崩潰」的判定皆由智能合約公正執行。
 
-### 3. Dynamic NFT State
-The `Investigator` object evolves based on gameplay results:
-- **EXP Growth:** Successful checks grant experience.
-- **Madness State:** If SAN drops to 0, the NFT is permanently marked as `is_mad`, changing its visual representation in the frontend.
+## ✨ Key Features (特色)
+
+### 1. 🌏 Bilingual & Cinematic Experience (沈浸式體驗)
+- **Cinematic Intro/Outro:** Full-screen text animations set the horror tone upon minting a new character.
+- **I18n Support:** One-click switch between **English** and **Traditional Chinese**.
+- **Background Music:** Integrated ambient soundscapes (with browser auto-play workarounds).
+
+### 2. 🎲 Verifiable On-Chain Randomness (VRF)
+We utilize the `0x8` Random module to determine:
+- **Environment Generation:** Human Realm, Asura Realm, or Hell Realm (each with different stat modifiers).
+- **Skill Checks:** STR (Constitution), DEX (Agility), and SAN (Willpower) checks are resolved atomically on-chain.
+
+### 3. 🏆 On-Chain Leaderboard (排行榜)
+- **ScoreEvent:** When a player escapes or goes mad, the contract emits a `ScoreEvent`.
+- **Global Ranking:** The frontend queries the blockchain history to display the **Top 10 players** who survived the deepest loops.
+
+### 4. ⚡ Batch Transactions (PTB)
+Leveraging IOTA's **Programmable Transaction Blocks (PTB)**:
+- **"Madness Mode" (瘋狂連發):** Players can execute 5 sequential skill checks in a **single atomic transaction** to speed up the farming process.
+
+---
 
 ## 🛠 Tech Stack
 
-- **Blockchain:** IOTA Rebased Testnet (Move)
-- **Frontend:** Next.js 14, Tailwind CSS, shadcn/ui
-- **Integration:** @iota/dapp-kit, @iota/iota-sdk
-- **Runtime:** Bun
+- **Blockchain:** IOTA Rebased Testnet
+- **Smart Contract:** Move (2024 beta edition)
+- **Frontend:** Next.js 14, Tailwind CSS, Shadcn/ui, Lucide React
+- **Client SDK:** `@iota/dapp-kit`, `@iota/iota-sdk`
+- **Storage:** LocalStorage (History) + On-Chain Events (Leaderboard)
+
+---
 
 ## 🚀 Getting Started
 
 ### Prerequisites
-- [Bun](https://bun.sh/) installed
+- [Bun](https://bun.sh/) (or Node.js)
 - [IOTA CLI](https://docs.iota.org/) installed
-- An IOTA Wallet (e.g., IOTA Wallet) with Testnet tokens
+- IOTA Wallet extension
 
-### 1. Clone the Repo
+### 1. Clone the Repository
 ```bash
-git clone [https://github.com/YOUR_USERNAME/iota-cthulhu-trpg.git](https://github.com/YOUR_USERNAME/iota-cthulhu-trpg.git)
-cd iota-cthulhu-trpg
+git clone [https://github.com/scvjoker/iota-trpg-escape.git](https://github.com/scvjoker/iota-trpg-escape.git)
+cd iota-trpg-escape
 
-2. Deploy Smart Contract (Backend)
-Bash
+```
 
+### 2. Deploy Smart Contract (Backend)
+
+```bash
 cd contracts/trpg_core
 iota move build
 iota client publish --gas-budget 500000000
-Copy the Package ID from the output.
 
-3. Configure Frontend
-Open client/src/utils/constants.ts and paste your Package ID:
+```
 
-TypeScript
+> ⚠️ **Important:** Copy the **Package ID** from the terminal output.
 
-export const PACKAGE_ID = "0xYour_Package_ID_Here";
-4. Run the Game
-Bash
+### 3. Configure Frontend
 
+Open `client/src/utils/constants.ts` and paste your Package ID:
+
+```typescript
+// client/src/utils/constants.ts
+export const PACKAGE_ID = "0xYOUR_PACKAGE_ID_HERE";
+export const MODULE_NAME = "investigator";
+export const RANDOM_OBJECT_ID = "0x8";
+
+```
+
+### 4. Run the Game
+
+```bash
 cd ../../client
 bun install
 bun dev
-Open http://localhost:3000 to play!
 
-📜 Contract Interface
-The core logic resides in investigator.move:
+```
 
-Rust
+Open `http://localhost:3000`.
 
-// Core struct representing the player
-public struct Investigator has key, store {
-    id: UID,
-    name: String,
-    san: u8,      // Sanity Point
-    is_mad: bool, // Madness Status
+---
+
+## 📜 Smart Contract Logic
+
+The core loop logic handles the "Ghost in the Stairwell" (鬼打牆) mechanic:
+
+```rust
+// contracts/trpg_core/sources/investigator.move
+
+if (is_success) {
+    // ... logic for escaping or finding clues ...
+    if (item.loop_depth > 0) {
+        // Emit ScoreEvent for Leaderboard
+        event::emit(ScoreEvent { 
+            name: item.name, 
+            depth: item.loop_depth, 
+            outcome: string::utf8(b"Escaped") 
+        });
+    }
+} else {
+    // Failure leads to deeper loops (鬼打牆)
+    item.loop_depth = item.loop_depth + 1;
+    item.san = item.san - dmg;
     // ...
 }
 
-// Atomic Batch Check Function
-entry fun batch_sanity_check(item: &mut Investigator, r: &Random, ctx: &mut TxContext) {
-    // Executes 5 checks in a single loop on-chain
-}
-太棒了！🎉 恭喜你完成了一個完整的全鏈上 GameFi 專案！在 Hackathon 中，程式碼是骨架，但 README 是靈魂。評審通常沒有時間跑每一個專案，他們會先看 README 和 GitHub 上的呈現。我們分兩步走：先處理 Git 上傳，再寫一份專業的 README。第一階段：上傳到 GitHub1. 準備 .gitignore (非常重要！)我們要防止垃圾檔案（如 node_modules 或編譯後的 build 資料夾）被上傳。請在專案根目錄 (~/iota-cthulhu-game/) 建立一個檔案叫做 .gitignore，貼上以下內容：Plaintext# Dependencies
-node_modules
-.pnp
-.pnp.js
+```
 
-# Testing
-.coverage
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+---
 
-# Next.js build output
-.next/
-out/
-build/
-dist/
+## 📸 Screenshots
 
-# IOTA Move build output
-contracts/**/build
-contracts/**/Move.lock
-2. 初始化 Git 並提交請在終端機執行以下指令（確保在 ~/iota-cthulhu-game/）：Bash# 1. 初始化 Git
-git init
+| **Recruitment (Mint)** | **Infinite Loop** | **Leaderboard** |
 
-# 2. 加入所有檔案
-git add .
+---
 
-# 3. 提交第一版
-git commit -m "Initial commit: IOTA Cthulhu TRPG GameFi Demo"
-3. 推送到 GitHub去 GitHub.com 登入。右上角點 + -> New repository。Repository name 填：iota-cthulhu-trpg (或你喜歡的名字)。Public/Private 看你需求 (Hackathon 通常要 Public)。點 Create repository。看到這個畫面後，複製 "…or push an existing repository from the command line" 那段指令，通常長這樣：Bashgit remote add origin https://github.com/你的帳號/iota-cthulhu-trpg.git
-git branch -M main
-git push -u origin main
-第二階段：專業級 README.md (Hackathon 專用)這份 README 專門為了展示 IOTA 的技術特點（VRF 隨機數、Move 合約、PTB 批量交易）而寫。請在根目錄建立 README.md，並貼上以下內容：Markdown# 🐙 Cthulhu Mythos on IOTA: Fully On-Chain TRPG
+## 🤝 Contributing
 
-> A decentralized Sanity Check game powered by IOTA Move Rebased, leveraging on-chain VRF and Programmable Transaction Blocks (PTB).
+Built for the **IOTA Hackathon 2025**.
 
-![Project Banner](https://placehold.co/600x200/1e293b/FFF?text=IOTA+Cthulhu+TRPG)
-
-## 📖 Introduction
-This project is a Proof-of-Concept for a fully on-chain TRPG (Tabletop Role-Playing Game) built on the IOTA Rebased Testnet. It demonstrates how to utilize **IOTA's `random` module** for fair gameplay and **Batch Transactions** to create intense, high-frequency gaming experiences without user friction.
-
-Players mint an "Investigator" NFT with randomized stats (STR, DEX, SAN) and perform "Sanity Checks" against the Great Old Ones.
-
-## ✨ Key Features
-
-### 1. Verifiable On-Chain Randomness (VRF)
-Unlike traditional EVM games that rely on oracle callbacks or insecure block hashes, this project uses IOTA's native `0x8` Random module.
-- **Fair Minting:** Investigator stats are generated atomically on-chain.
-- **Unpredictable Outcomes:** Every Sanity Check is truly random and verifiable.
-
-### 2. Batch Transactions (The "Madness" Mode)
-We leverage IOTA's unique architecture to execute **5x Sanity Checks in a single atomic transaction**.
-- **User Experience:** No need to sign 5 separate pop-ups.
-- **Efficiency:** Demonstrates the power of Move's composability and IOTA's high throughput.
-
-### 3. Dynamic NFT State
-The `Investigator` object evolves based on gameplay results:
-- **EXP Growth:** Successful checks grant experience.
-- **Madness State:** If SAN drops to 0, the NFT is permanently marked as `is_mad`, changing its visual representation in the frontend.
-
-## 🛠 Tech Stack
-
-- **Blockchain:** IOTA Rebased Testnet (Move)
-- **Frontend:** Next.js 14, Tailwind CSS, shadcn/ui
-- **Integration:** @iota/dapp-kit, @iota/iota-sdk
-- **Runtime:** Bun
-
-## 🚀 Getting Started
-
-### Prerequisites
-- [Bun](https://bun.sh/) installed
-- [IOTA CLI](https://docs.iota.org/) installed
-- An IOTA Wallet (e.g., IOTA Wallet) with Testnet tokens
-
-### 1. Clone the Repo
-```bash
-git clone [https://github.com/YOUR_USERNAME/iota-cthulhu-trpg.git](https://github.com/YOUR_USERNAME/iota-cthulhu-trpg.git)
-cd iota-cthulhu-trpg
-2. Deploy Smart Contract (Backend)Bashcd contracts/trpg_core
-iota move build
-iota client publish --gas-budget 500000000
-Copy the Package ID from the output.3. Configure FrontendOpen client/src/utils/constants.ts and paste your Package ID:TypeScriptexport const PACKAGE_ID = "0xYour_Package_ID_Here";
-4. Run the GameBashcd ../../client
-bun install
-bun dev
-Open http://localhost:3000 to play!📜 Contract InterfaceThe core logic resides in investigator.move:Rust// Core struct representing the player
-public struct Investigator has key, store {
-    id: UID,
-    name: String,
-    san: u8,      // Sanity Point
-    is_mad: bool, // Madness Status
-    // ...
-}
-
-// Atomic Batch Check Function
-entry fun batch_sanity_check(item: &mut Investigator, r: &Random, ctx: &mut TxContext) {
-    // Executes 5 checks in a single loop on-chain
-}
-📸 ScreenshotsInitial StateMinted InvestigatorMadness State
-
-
-
-🤝 Contributing
-Built for the IOTA Hackathon 2025.
+* **Developer:** [scvjoker]
+* **License:** MIT
