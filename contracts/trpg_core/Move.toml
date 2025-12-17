@@ -1,0 +1,13 @@
+[package]
+name = "trpg_core"
+version = "0.0.1"
+edition = "2024.beta"
+
+[dependencies]
+# 指向 IOTA Testnet 框架
+Iota = { git = "https://github.com/iotaledger/iota.git", subdir = "crates/iota-framework/packages/iota-framework", rev = "testnet" }
+
+[addresses]
+trpg_core = "0x0"
+iota = "0x2"
+std = "0x1"
