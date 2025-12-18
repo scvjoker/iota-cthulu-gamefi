@@ -1,0 +1,373 @@
+"use client";
+
+import { useCurrentAccount, useSignAndExecuteTransaction, useIotaClient } from "@iota/dapp-kit";
+import { Transaction } from "@iota/iota-sdk/transactions";
+import { useState, useEffect, useRef } from "react";
+import { toast } from "sonner";
+import { PACKAGE_ID, MODULE_NAME, RANDOM_OBJECT_ID } from "@/utils/constants";
+import { TEXTS, processLog, Lang } from "@/utils/localization";
+import { CinematicText } from "@/components/shared/CinematicText";
+import { HistorySection } from "@/components/game/HistorySection";
+import { LeaderboardSection } from "@/components/game/LeaderboardSection";
+import { SimulationView } from "@/components/game/SimulationView";
+import { Button } from "@/components/ui/button";
+import { FileText, Stamp, Activity, Phone } from "lucide-react"; 
+import useSound from 'use-sound'; 
+
+import {
+  Chart as ChartJS, RadialLinearScale, PointElement, LineElement, Filler, Tooltip, Legend, ArcElement, CategoryScale, LinearScale, BarElement
+} from 'chart.js';
+ChartJS.register(RadialLinearScale, PointElement, LineElement, Filler, Tooltip, Legend, ArcElement, CategoryScale, LinearScale, BarElement);
+
+// --- Loading 訊息池 ---
+const LOADING_MSGS = {
+    zh: [
+        "正在聯絡人資部門...", "正在偽造加班紀錄...", "正在與不可名狀之物連線...",
+        "老闆正在盯著你的螢幕...", "正在計算精神賠償...", "正在清空瀏覽器紀錄...",
+        "正在將靈魂上傳至 IOTA 網絡...", "正在躲避辦公室的黑影..."
+    ],
+    en: [
+        "Contacting HR...", "Forging overtime records...", "Connecting with the Abyss...",
+        "The Boss is watching you...", "Calculating compensation...", "Wiping browser history...",
+        "Uploading soul to IOTA...", "Evading office shadows..."
+    ]
+};
+
+// --- AdventureOverlay (保持你的所有功能與音效) ---
+function AdventureOverlay({ logs, onClose, outcome, lang }: { logs: string[], onClose: (ended: boolean, outcome: string) => void, outcome: string, lang: Lang }) {
+    const [displayLogs, setDisplayLogs] = useState<string[]>([]);
+    const [currentIndex, setCurrentIndex] = useState(0);
+    const bottomRef = useRef<HTMLDivElement>(null);
+    const isMadness = outcome.toLowerCase().includes("madness");
+    const [playTyping] = useSound('https://assets.mixkit.co/active_storage/sfx/1105/1105-preview.mp3', { volume: 0.2 });
+
+    useEffect(() => { 
+        if (currentIndex < logs.length) { 
+            const timer = setTimeout(() => { 
+                playTyping();
+                setDisplayLogs(prev => [...prev, processLog(logs[currentIndex], lang)]); 
+                setCurrentIndex(prev => prev + 1); 
+            }, 800); 
+            return () => clearTimeout(timer); 
+        } 
+    }, [currentIndex, logs, lang, playTyping]);
+
+    useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [displayLogs]);
+    const isFinished = currentIndex >= logs.length;
+    const isFinalEnding = outcome === "MADNESS" || outcome === "Escaped" || outcome === "Madness" || outcome === "Resigned";
+    
+    return (
+        <div className="fixed inset-0 z-[80] bg-black/95 flex flex-col items-center justify-center p-6 animate-in fade-in duration-300">
+            <div className={`max-w-2xl w-full h-[80vh] flex flex-col gap-4 border-x border-slate-800 bg-slate-950/50 transition-all duration-500
+                ${isMadness ? "shake-anim border-red-600 shadow-[0_0_50px_rgba(220,38,38,0.5)]" : ""}`}>
+                <div className={`p-4 border-b border-slate-800 ${isMadness ? "bg-red-950/50" : "bg-slate-900"}`}>
+                    <h2 className={`text-xl font-mono flex items-center gap-2 ${isMadness ? "text-red-500" : "text-green-500"}`}>
+                        <span className="animate-pulse">●</span> {isMadness ? "FATAL ERROR: MENTAL COLLAPSE" : "TRPG LOG"}
+                    </h2>
+                </div>
+                <div className="flex-1 overflow-y-auto p-6 font-mono text-base space-y-4 custom-scrollbar">
+                    {displayLogs.map((log, idx) => (
+                        <div key={idx} className={`border-l-2 pl-4 py-2 animate-in slide-in-from-left-2 fade-in ${isMadness ? "border-red-500 text-red-400" : "border-slate-700 text-slate-300"}`}>
+                            <span>{log}</span>
+                        </div>
+                    ))}
+                    <div ref={bottomRef} />
+                </div>
+                {isFinished && (
+                    <div className={`p-6 border-t border-slate-800 flex justify-center ${isMadness ? "bg-red-950/50" : "bg-slate-900"}`}>
+                        <Button onClick={() => onClose(isFinalEnding, outcome)} className={`w-full max-w-sm font-bold text-lg h-12 transition-colors ${isMadness ? "bg-red-600 text-white hover:bg-red-500" : "bg-slate-100 text-black hover:bg-white"}`}>
+                            {isMadness ? "EMBRACE THE DARKNESS" : (outcome === "Looping" ? "🔄 Continue" : "🚪 Close")}
+                        </Button>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
+
+// --- 離職證書組件 (保持不變) ---
+function ResignationCertificate({ data, onClose, t }: { data: any, onClose: () => void, t: any }) {
+    if (!data) return null;
+    const depth = data.final_depth !== undefined ? data.final_depth : data.loop_depth;
+    const exp = data.career_exp !== undefined ? data.career_exp : data.exp;
+    return (
+        <div className="fixed inset-0 z-[90] bg-black/90 flex items-center justify-center p-4 animate-in fade-in duration-500 backdrop-blur-sm">
+            <div className="bg-[#fdfbf7] text-slate-900 w-full max-w-md p-8 shadow-2xl relative transform rotate-1 animate-in zoom-in-95 duration-500 border border-slate-300">
+                <div className="absolute inset-2 border-2 border-double border-slate-800 pointer-events-none"></div>
+                <div className="text-center font-serif space-y-6 pt-4 relative z-10">
+                    <div className="flex justify-center text-slate-800 mb-2"><FileText size={48} strokeWidth={1} /></div>
+                    <h1 className="text-3xl font-bold border-b-2 border-slate-800 pb-4 inline-block px-8 tracking-widest">{t.cert_title}</h1>
+                    <div className="text-lg leading-relaxed text-slate-700">
+                        <p>{t.cert_content}</p>
+                        <p className="text-2xl font-bold my-2 text-indigo-900 font-mono bg-slate-100 py-1">{data.name}</p>
+                        <p>{t.cert_content2}</p>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4 text-sm border-t border-dashed border-slate-400 pt-4 mt-4">
+                        <div className="text-right text-slate-500">{t.cert_stat_depth}:</div>
+                        <div className="text-left font-bold font-mono text-xl">B{depth}F</div>
+                        <div className="text-right text-slate-500">{t.cert_stat_mist}:</div>
+                        <div className="text-left font-bold font-mono text-xl">{exp}</div>
+                    </div>
+                    <div className="flex justify-end mt-8 pt-4 relative">
+                        <div className="absolute -top-6 right-8 transform rotate-[-15deg] opacity-90 animate-in zoom-in duration-300 delay-500">
+                            <div className="border-4 border-red-700 text-red-700 px-4 py-2 font-black text-xl tracking-widest uppercase rounded-sm flex items-center gap-2 shadow-sm" style={{mixBlendMode: 'multiply'}}>
+                                <Stamp size={24}/> {t.cert_stamp}
+                            </div>
+                            <div className="text-red-700/80 text-[10px] text-center mt-1 font-bold">{t.cert_dept}</div>
+                        </div>
+                    </div>
+                </div>
+                <div className="mt-12">
+                    <Button onClick={onClose} className="w-full bg-slate-900 text-white hover:bg-slate-800 h-12 font-bold tracking-wide shadow-lg">{t.cert_close}</Button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+export function GameDashboard({ lang }: { lang: Lang }) {
+  const account = useCurrentAccount();
+  const client = useIotaClient();
+  const { mutate: signAndExecuteTransaction } = useSignAndExecuteTransaction();
+
+  const [loading, setLoading] = useState(false);
+  const [loadingMsg, setLoadingMsg] = useState(""); 
+  const [investigators, setInvestigators] = useState<any[]>([]);
+  const [memorials, setMemorials] = useState<any[]>([]); 
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [adventureData, setAdventureData] = useState<any>(null); 
+  const [viewingCert, setViewingCert] = useState<any>(null); 
+  const [showIntro, setShowIntro] = useState(true);
+  const [outroType, setOutroType] = useState<any>("none");
+  const [showGhost, setShowGhost] = useState(false); // 🔥 彩蛋
+
+  const STORAGE_KEY = `iota_trpg_history_${PACKAGE_ID}`; 
+  const [history, setHistory] = useState<any[]>([]);
+
+  // 音效 Hook
+ // 🔥 改為讀取本地 public/sounds/ 資料夾，解決 CORS 與 403 問題
+  const [playClick] = useSound('/sounds/click.mp3', { volume: 0.5 });
+  const [playSuccess] = useSound('/sounds/success.mp3', { volume: 0.5 });
+  const [playStamp] = useSound('/sounds/stamp.mp3', { volume: 0.6 });
+  const [playStatic] = useSound('/sounds/static.mp3', { volume: 0.2 });
+  const [playWhisper] = useSound('/sounds/whisper.mp3', { volume: 0.8 }); // 彩蛋暫用雜訊代替，或補一個 whisper.mp3
+
+  const currentInvestigator = investigators.find(i => i.id === selectedId);
+  const t = TEXTS[lang]; 
+  const isBroken = currentInvestigator?.is_mad === true;
+
+  // 🔥 1. 修復後的動態標題
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      if (isBroken) {
+        document.title = "🆘 HELP ME HELP ME HELP ME";
+      } else {
+        document.title = lang === 'zh' ? "IOTA 社畜調查員" : "IOTA Investigator";
+      }
+    }
+  }, [isBroken, lang]);
+
+  // 🔥 2. 彩蛋觸發
+  const triggerEasterEgg = () => {
+    playWhisper();
+    setShowGhost(true);
+    setTimeout(() => setShowGhost(false), 400); 
+  };
+
+  useEffect(() => { if (isBroken) playStatic(); }, [isBroken, playStatic]);
+
+  useEffect(() => {
+    if (loading) {
+        const msgs = LOADING_MSGS[lang] || LOADING_MSGS.en;
+        setLoadingMsg(msgs[Math.floor(Math.random() * msgs.length)]);
+    }
+  }, [loading, lang]);
+
+  useEffect(() => { 
+      const saved = localStorage.getItem(STORAGE_KEY); 
+      if (saved) try { setHistory(JSON.parse(saved)); } catch (e) {} 
+  }, [STORAGE_KEY]);
+
+  const addToHistory = (logs: string[], outcome: string) => { 
+      if (!currentInvestigator) return;
+      const newEntry = { 
+          id: crypto.randomUUID(), 
+          timestamp: Date.now(), 
+          logs, 
+          outcome,
+          investigatorId: currentInvestigator.id, 
+          investigatorName: currentInvestigator.name 
+      }; 
+      const newHistory = [newEntry, ...history]; 
+      setHistory(newHistory); 
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(newHistory)); 
+  };
+
+  const fetchData = async () => {
+    if (!account) return;
+    const objects = await client.getOwnedObjects({ owner: account.address, options: { showType: true, showContent: true } });
+    const investType = `${PACKAGE_ID}::${MODULE_NAME}::Investigator`;
+    const sbtType = `${PACKAGE_ID}::${MODULE_NAME}::MemorialSBT`;
+    const activeList: any[] = [];
+    const resignedList: any[] = [];
+    objects.data.forEach((obj) => {
+        if (obj.data?.content?.dataType === "moveObject") {
+            const fields = { ...obj.data.content.fields, id: obj.data.objectId };
+            if (obj.data.type === investType) activeList.push(fields);
+            else if (obj.data.type === sbtType) resignedList.push(fields);
+        }
+    });
+    setInvestigators(activeList);
+    setMemorials(resignedList);
+    if (!selectedId && activeList.length > 0) setSelectedId(activeList[0].id);
+  };
+
+  useEffect(() => { fetchData(); }, [account]);
+
+  const executeScenarioTx = async (tx: Transaction) => { 
+      setLoading(true); 
+      tx.setGasBudget(100000000); 
+      signAndExecuteTransaction({ transaction: tx, options: { showEffects: true, showEvents: true } }, { 
+          onSuccess: async (result) => { 
+              playSuccess(); 
+              await fetchData(); 
+              let events = result.events || []; 
+              if (events.length === 0) { 
+                  await new Promise(r => setTimeout(r, 2000)); 
+                  try { const r = await client.getTransactionBlock({ digest: result.digest, options: { showEvents: true, showEffects: true } }); events = r.events || []; } catch (e) {} 
+              } 
+              const event = events.find(e => e.type.includes("ScenarioEvent")); 
+              if (event) { 
+                  setAdventureData({ logs: event.parsedJson?.logs, outcome: event.parsedJson?.outcome }); 
+                  addToHistory(event.parsedJson?.logs, event.parsedJson?.outcome); 
+              } 
+              setLoading(false); 
+          }, 
+          onError: (e) => { toast.error(e.message); setLoading(false); } 
+      }); 
+  };
+  
+  const mint = () => { 
+    playClick(); 
+    const tx = new Transaction(); 
+    tx.moveCall({ target: `${PACKAGE_ID}::${MODULE_NAME}::mint`, arguments: [ tx.object(RANDOM_OBJECT_ID), tx.pure.vector("u8", Array.from(new TextEncoder().encode("Staff #" + Math.floor(Math.random()*9000+1000)))) ] }); 
+    tx.setGasBudget(50000000); 
+    signAndExecuteTransaction({ transaction: tx, options: { showEffects: true, showEvents: true } }, { 
+        onSuccess: () => { setLoading(false); setTimeout(fetchData, 1000); setShowIntro(true); }, 
+        onError: (err) => { toast.error(err.message); setLoading(false); } 
+    }); 
+  };
+  
+  const resign = () => {
+      if (!currentInvestigator) return;
+      playClick();
+      const tx = new Transaction();
+      tx.moveCall({ target: `${PACKAGE_ID}::${MODULE_NAME}::resign`, arguments: [tx.object(currentInvestigator.id)] });
+      tx.setGasBudget(50000000);
+      signAndExecuteTransaction({ transaction: tx, options: { showEffects: true, showEvents: true } }, {
+          onSuccess: (result) => { 
+              playStamp(); 
+              setLoading(false); 
+              toast.success(lang === 'zh' ? "離職手續已完成" : "Resignation Accepted");
+              const logs = ["=== HR Department ===", "Resignation letter received.", "NFT Access Card destroyed.", "You are free."];
+              addToHistory(logs, "Resigned"); 
+              setTimeout(() => { fetchData(); setSelectedId(null); }, 1000);
+          },
+          onError: (err) => { toast.error(err.message); setLoading(false); }
+      });
+  };
+
+  const singleSanityCheck = () => { if(!currentInvestigator) return; playClick(); const tx = new Transaction(); tx.moveCall({target:`${PACKAGE_ID}::${MODULE_NAME}::sanity_check`, arguments:[tx.object(currentInvestigator.id), tx.object(RANDOM_OBJECT_ID)]}); executeScenarioTx(tx); };
+  const batchSanityCheck = () => { if(!currentInvestigator) return; playClick(); const tx = new Transaction(); tx.moveCall({target:`${PACKAGE_ID}::${MODULE_NAME}::batch_sanity_check`, arguments:[tx.object(currentInvestigator.id), tx.object(RANDOM_OBJECT_ID)]}); executeScenarioTx(tx); };
+  const playQuick = () => { if(!currentInvestigator)return; playClick(); const tx = new Transaction(); tx.moveCall({target:`${PACKAGE_ID}::${MODULE_NAME}::play_stairs_quick`,arguments:[tx.object(currentInvestigator.id),tx.object(RANDOM_OBJECT_ID)]}); executeScenarioTx(tx); };
+  const playManualStart = () => { if(!currentInvestigator)return; playClick(); const tx = new Transaction(); tx.moveCall({target:`${PACKAGE_ID}::${MODULE_NAME}::manual_start`,arguments:[tx.object(currentInvestigator.id),tx.object(RANDOM_OBJECT_ID)]}); executeScenarioTx(tx); };
+  const playManualAction = (c:number) => { if(!currentInvestigator)return; playClick(); const tx = new Transaction(); tx.moveCall({target:`${PACKAGE_ID}::${MODULE_NAME}::manual_resolve`,arguments:[tx.object(currentInvestigator.id),tx.object(RANDOM_OBJECT_ID),tx.pure.u8(c)]}); executeScenarioTx(tx); };
+  const getImageUrl = (inv: any) => inv?.is_mad ? "/images/madness.png" : "/images/investigator.png";
+
+  return (
+      <>
+          {/* 🔥 CRT 濾鏡層 */}
+          <div className="crt-screen" />
+
+          {/* 🔥 彩蛋黑影閃現 */}
+          {showGhost && <div className="ghost-flash" />}
+
+          {/* 斷訊效果 Overlay */}
+          {isBroken && <div className="noise-overlay" />}
+
+          {/* 社畜 Loading Overlay */}
+          {loading && (
+              <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-black/60 backdrop-blur-md animate-in fade-in duration-300">
+                  <div className="relative mb-8">
+                      <div className="w-20 h-20 border-4 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin"></div>
+                      <div className="absolute inset-0 flex items-center justify-center text-emerald-500">
+                          <Activity size={32} className="animate-pulse" />
+                      </div>
+                  </div>
+                  <div className="text-2xl font-mono text-emerald-400 tracking-widest text-center px-4 drop-shadow-[0_0_8px_rgba(52,211,153,0.5)]">
+                      {loadingMsg}
+                  </div>
+                  <div className="mt-4 flex flex-col items-center gap-2">
+                      <div className="flex gap-1">
+                          {[0, 1, 2].map((i) => (
+                              <div key={i} className="w-2 h-2 bg-emerald-500 rounded-full animate-bounce" style={{ animationDelay: `${i * 0.15}s` }}></div>
+                          ))}
+                      </div>
+                      <span className="text-[10px] font-mono text-slate-500 uppercase tracking-[0.2em]">Transaction Processing...</span>
+                  </div>
+                  <div className="absolute bottom-10 w-64 h-1 bg-slate-800 rounded-full overflow-hidden">
+                      <div className="h-full bg-emerald-500/50 animate-progress-loop"></div>
+                  </div>
+              </div>
+          )}
+
+          {showIntro && <CinematicText lines={t.intro_lines} onComplete={() => setShowIntro(false)} />}
+          {outroType !== "none" && <CinematicText lines={outroType==="madness"?t.outro_madness:t.outro_escaped} onComplete={() => setOutroType("none")} isMadness={outroType==="madness"} />}
+          
+          {adventureData && <AdventureOverlay logs={adventureData.logs} outcome={adventureData.outcome} lang={lang} onClose={(ended: boolean, outcome: string) => { setAdventureData(null); fetchData(); if (ended) setOutroType(outcome.toLowerCase().includes("mad")?"madness":"escaped"); }} />}
+          
+          {viewingCert && <ResignationCertificate data={viewingCert} t={t} onClose={() => setViewingCert(null)} />}
+
+          <div className="max-w-6xl mx-auto mt-8 px-4 pb-20 animate-in fade-in zoom-in-95 duration-500 relative z-20">
+              <div className="text-center mb-8">
+                  <h1 className={`text-4xl md:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-indigo-600 font-serif tracking-widest uppercase mb-2 ${isBroken ? "animate-pulse" : ""}`}>
+                      {t.title}
+                  </h1>
+                  <p className="text-slate-500 text-sm tracking-widest">{t.subtitle}</p>
+              </div>
+
+              <SimulationView 
+                  account={account} 
+                  investigators={investigators} 
+                  memorials={memorials} 
+                  currentInvestigator={currentInvestigator} 
+                  loading={loading} 
+                  t={t}
+                  mint={mint} 
+                  singleSanityCheck={singleSanityCheck} 
+                  batchSanityCheck={batchSanityCheck} 
+                  playQuick={playQuick} playManualStart={playManualStart} playManualAction={playManualAction}
+                  resign={resign} 
+                  setSelectedId={setSelectedId} 
+                  onViewCert={(sbt:any) => { playClick(); setViewingCert(sbt); }} 
+                  getImageUrl={getImageUrl} 
+                  lang={lang}
+              />
+
+              {/* 🔥 3. 隱藏彩蛋按鈕 (放右下角) */}
+              <button 
+                onClick={triggerEasterEgg}
+                className="fixed bottom-4 right-4 text-slate-800 hover:text-red-900 transition-colors opacity-20 hover:opacity-100 z-50"
+                title="System Maintenance"
+              >
+                <Phone size={16} />
+              </button>
+
+              <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <HistorySection history={history} lang={lang} />
+                  <LeaderboardSection client={client} lang={lang} />
+              </div>
+          </div>
+      </>
+  );
+}

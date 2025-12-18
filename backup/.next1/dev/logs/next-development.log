@@ -1,0 +1,5 @@
+[00:00:01.895] Server  LOG      ✓ Ready in 1331ms
+[00:00:09.191] Server  LOG      ○ Compiling / ...
+[00:00:16.384] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:00:19.159] Browser ERROR   uncaughtError: ReferenceError: FileText is not defined
+[00:00:28.329] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold

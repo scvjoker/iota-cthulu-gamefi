@@ -1,0 +1,174 @@
+"use client";
+
+import { useCurrentAccount, useSignAndExecuteTransaction, useIotaClient } from "@iota/dapp-kit";
+import { Transaction } from "@iota/iota-sdk/transactions";
+import { useState, useEffect, useRef } from "react";
+import { toast } from "sonner";
+import { PACKAGE_ID, MODULE_NAME, RANDOM_OBJECT_ID } from "@/utils/constants";
+import { TEXTS, processLog, Lang } from "@/utils/localization";
+import { CinematicText } from "@/components/shared/CinematicText";
+import { HistorySection } from "@/components/game/HistorySection";
+import { LeaderboardSection } from "@/components/game/LeaderboardSection";
+import { SimulationView } from "@/components/game/SimulationView";
+import { Button } from "@/components/ui/button";
+
+// Chart.js 註冊
+import {
+  Chart as ChartJS, RadialLinearScale, PointElement, LineElement, Filler, Tooltip, Legend, ArcElement, CategoryScale, LinearScale, BarElement
+} from 'chart.js';
+ChartJS.register(RadialLinearScale, PointElement, LineElement, Filler, Tooltip, Legend, ArcElement, CategoryScale, LinearScale, BarElement);
+
+// AdventureOverlay 保持不變，只負責顯示當下的冒險 Log
+function AdventureOverlay({ logs, onClose, outcome, lang }: { logs: string[], onClose: (ended: boolean, outcome: string) => void, outcome: string, lang: Lang }) {
+    const [displayLogs, setDisplayLogs] = useState<string[]>([]);
+    const [currentIndex, setCurrentIndex] = useState(0);
+    const bottomRef = useRef<HTMLDivElement>(null);
+    useEffect(() => { if (currentIndex < logs.length) { const timer = setTimeout(() => { setDisplayLogs(prev => [...prev, processLog(logs[currentIndex], lang)]); setCurrentIndex(prev => prev + 1); }, 800); return () => clearTimeout(timer); } }, [currentIndex, logs]);
+    useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [displayLogs]);
+    const isFinished = currentIndex >= logs.length;
+    const isFinalEnding = outcome === "MADNESS" || outcome === "Escaped" || outcome === "Madness" || outcome === "Resigned";
+    return (
+        <div className="fixed inset-0 z-50 bg-black/95 flex flex-col items-center justify-center p-6 animate-in fade-in duration-300">
+            <div className="max-w-2xl w-full h-[80vh] flex flex-col gap-4 border-x border-slate-800 bg-slate-950/50">
+                <div className="p-4 border-b border-slate-800 bg-slate-900"><h2 className="text-xl font-mono text-green-500 flex items-center gap-2"><span className="animate-pulse">●</span> TRPG LOG</h2></div>
+                <div className="flex-1 overflow-y-auto p-6 font-mono text-base space-y-4 custom-scrollbar">
+                    {displayLogs.map((log, idx) => (<div key={idx} className="border-l-2 border-slate-700 pl-4 py-2 animate-in slide-in-from-left-2 fade-in"><span className="text-slate-300">{log}</span></div>))}
+                    <div ref={bottomRef} />
+                </div>
+                {isFinished && <div className="p-6 border-t border-slate-800 flex justify-center bg-slate-900"><Button onClick={() => onClose(isFinalEnding, outcome)} className="w-full max-w-sm bg-slate-100 text-black hover:bg-white font-bold text-lg h-12">{outcome === "Looping" ? "🔄 Continue" : "🚪 Close"}</Button></div>}
+            </div>
+        </div>
+    );
+}
+
+export function GameDashboard({ lang }: { lang: Lang }) {
+  const account = useCurrentAccount();
+  const client = useIotaClient();
+  const { mutate: signAndExecuteTransaction } = useSignAndExecuteTransaction();
+
+  const [loading, setLoading] = useState(false);
+  const [investigators, setInvestigators] = useState<any[]>([]);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [adventureData, setAdventureData] = useState<any>(null);
+  const [showIntro, setShowIntro] = useState(true);
+  const [outroType, setOutroType] = useState<any>("none");
+  
+  // 🔥 修正 1: 使用包含 PACKAGE_ID 的 Key，確保換合約後 Log 不會混淆
+  const STORAGE_KEY = `iota_trpg_history_${PACKAGE_ID}`; 
+  const [history, setHistory] = useState<any[]>([]);
+
+  useEffect(() => { 
+      const saved = localStorage.getItem(STORAGE_KEY); 
+      if (saved) try { setHistory(JSON.parse(saved)); } catch (e) {} 
+  }, []);
+
+  const currentInvestigator = investigators.find(i => i.id === selectedId);
+  const t = TEXTS[lang]; 
+
+  // 🔥 修正 2: 儲存 History 時，加入角色 ID 和名稱
+  const addToHistory = (logs: string[], outcome: string) => { 
+      if (!currentInvestigator) return;
+      
+      const newEntry = { 
+          id: crypto.randomUUID(), // 給 Log 一個唯一 ID
+          timestamp: Date.now(), 
+          logs, 
+          outcome,
+          investigatorId: currentInvestigator.id, // 綁定角色 ID
+          investigatorName: currentInvestigator.name // 綁定角色名稱
+      }; 
+      
+      const newHistory = [newEntry, ...history]; // 新的在最前
+      setHistory(newHistory); 
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(newHistory)); 
+  };
+
+  const fetchInvestigators = async () => {
+    if (!account) return;
+    const objects = await client.getOwnedObjects({ owner: account.address, options: { showType: true, showContent: true } });
+    const targetType = `${PACKAGE_ID}::${MODULE_NAME}::Investigator`;
+    const foundList = objects.data.filter((obj) => obj.data?.type === targetType).map((obj) => { if (obj.data?.content?.dataType === "moveObject") return { ...obj.data.content.fields, id: obj.data.objectId }; return null; }).filter(Boolean);
+    setInvestigators(foundList);
+    if (!selectedId && foundList.length > 0) setSelectedId(foundList[0].id);
+  };
+  useEffect(() => { fetchInvestigators(); }, [account]);
+
+  const executeScenarioTx = async (tx: Transaction) => { 
+      setLoading(true); 
+      tx.setGasBudget(100000000); 
+      signAndExecuteTransaction({ transaction: tx, options: { showEffects: true, showEvents: true } }, { 
+          onSuccess: async (result) => { 
+              let events = result.events || []; 
+              if (events.length === 0) { 
+                  await new Promise(r => setTimeout(r, 2000)); 
+                  try { 
+                      const r = await client.getTransactionBlock({ digest: result.digest, options: { showEvents: true, showEffects: true } }); 
+                      events = r.events || []; 
+                  } catch (e) {} 
+              } 
+              const event = events.find(e => e.type.includes("ScenarioEvent")); 
+              if (event) { 
+                  // 顯示冒險視窗
+                  setAdventureData({ logs: event.parsedJson?.logs, outcome: event.parsedJson?.outcome }); 
+                  // 寫入歷史紀錄
+                  addToHistory(event.parsedJson?.logs, event.parsedJson?.outcome); 
+              } 
+              setLoading(false); 
+          }, 
+          onError: (e) => { toast.error(e.message); setLoading(false); } 
+      }); 
+  };
+  
+  const mint = () => { const tx = new Transaction(); tx.moveCall({ target: `${PACKAGE_ID}::${MODULE_NAME}::mint`, arguments: [ tx.object(RANDOM_OBJECT_ID), tx.pure.vector("u8", Array.from(new TextEncoder().encode("Staff #" + Math.floor(Math.random()*9000+1000)))) ] }); tx.setGasBudget(50000000); signAndExecuteTransaction({ transaction: tx, options: { showEffects: true, showEvents: true } }, { onSuccess: () => { setLoading(false); setTimeout(fetchInvestigators, 1000); setShowIntro(true); }, onError: (err) => { toast.error(err.message); setLoading(false); } }); };
+  
+  const resign = () => {
+      if (!currentInvestigator) return;
+      const tx = new Transaction();
+      tx.moveCall({ target: `${PACKAGE_ID}::${MODULE_NAME}::resign`, arguments: [tx.object(currentInvestigator.id)] });
+      tx.setGasBudget(50000000);
+      signAndExecuteTransaction({ transaction: tx, options: { showEffects: true, showEvents: true } }, {
+          onSuccess: (result) => { 
+              setLoading(false); 
+              toast.success(lang === 'zh' ? "離職手續已完成 (NFT 銷毀)" : "Resignation Accepted (NFT Burned)");
+              const logs = ["=== HR Department ===", "Resignation letter received.", "NFT Access Card destroyed.", "You are free."];
+              setAdventureData({ logs, outcome: "Resigned" });
+              addToHistory(logs, "Resigned");
+              setTimeout(() => { fetchInvestigators(); setSelectedId(null); }, 1000);
+          },
+          onError: (err) => { toast.error(err.message); setLoading(false); }
+      });
+  };
+
+  const singleSanityCheck = () => { if(!currentInvestigator) return; const tx = new Transaction(); tx.moveCall({target:`${PACKAGE_ID}::${MODULE_NAME}::sanity_check`, arguments:[tx.object(currentInvestigator.id), tx.object(RANDOM_OBJECT_ID)]}); executeScenarioTx(tx); };
+  const batchSanityCheck = () => { if(!currentInvestigator) return; const tx = new Transaction(); tx.moveCall({target:`${PACKAGE_ID}::${MODULE_NAME}::batch_sanity_check`, arguments:[tx.object(currentInvestigator.id), tx.object(RANDOM_OBJECT_ID)]}); executeScenarioTx(tx); };
+  const playQuick = () => { if(!currentInvestigator)return; const tx = new Transaction(); tx.moveCall({target:`${PACKAGE_ID}::${MODULE_NAME}::play_stairs_quick`,arguments:[tx.object(currentInvestigator.id),tx.object(RANDOM_OBJECT_ID)]}); executeScenarioTx(tx); };
+  const playManualStart = () => { if(!currentInvestigator)return; const tx = new Transaction(); tx.moveCall({target:`${PACKAGE_ID}::${MODULE_NAME}::manual_start`,arguments:[tx.object(currentInvestigator.id),tx.object(RANDOM_OBJECT_ID)]}); executeScenarioTx(tx); };
+  const playManualAction = (c:number) => { if(!currentInvestigator)return; const tx = new Transaction(); tx.moveCall({target:`${PACKAGE_ID}::${MODULE_NAME}::manual_resolve`,arguments:[tx.object(currentInvestigator.id),tx.object(RANDOM_OBJECT_ID),tx.pure.u8(c)]}); executeScenarioTx(tx); };
+  const getImageUrl = (inv: any) => inv?.is_mad ? "/images/madness.png" : "/images/investigator.png";
+
+  return (
+      <>
+          {showIntro && <CinematicText lines={t.intro_lines} onComplete={() => setShowIntro(false)} />}
+          {outroType !== "none" && <CinematicText lines={outroType==="madness"?t.outro_madness:t.outro_escaped} onComplete={() => setOutroType("none")} isMadness={outroType==="madness"} />}
+          {adventureData && <AdventureOverlay logs={adventureData.logs} outcome={adventureData.outcome} lang={lang} onClose={(ended: boolean, outcome: string) => { setAdventureData(null); fetchInvestigators(); if (ended) setOutroType(outcome.toLowerCase().includes("mad")?"madness":"escaped"); }} />}
+          
+          <div className="max-w-6xl mx-auto mt-8 px-4 pb-20 animate-in fade-in zoom-in-95 duration-500">
+              <div className="text-center mb-8"><h1 className="text-4xl md:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-indigo-600 font-serif tracking-widest uppercase mb-2">{t.title}</h1><p className="text-slate-500 text-sm tracking-widest">{t.subtitle}</p></div>
+              <SimulationView 
+                  account={account} investigators={investigators} currentInvestigator={currentInvestigator} loading={loading} t={t}
+                  mint={mint} 
+                  singleSanityCheck={singleSanityCheck} 
+                  batchSanityCheck={batchSanityCheck} 
+                  playQuick={playQuick} playManualStart={playManualStart} playManualAction={playManualAction}
+                  resign={resign} 
+                  setSelectedId={setSelectedId} getImageUrl={getImageUrl} lang={lang}
+              />
+              <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* 🔥 將篩選過的 History 傳遞進去 (可選：如果要全顯示就直接傳 history) */}
+                  <HistorySection history={history} lang={lang} />
+                  <LeaderboardSection client={client} lang={lang} />
+              </div>
+          </div>
+      </>
+  );
+}

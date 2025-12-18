@@ -1,0 +1,152 @@
+export type Lang = 'zh' | 'en';
+
+export const TEXTS = {
+    zh: {
+        title: "IOTA TRPG：逃離血汗辦公大樓",
+        subtitle: "基於 IOTA 區塊鏈的無限加班模擬器",
+        recruit_btn: "+ 招募新社畜",
+        list_title: "👥 員工名單",
+        status_mad: "💀 過勞死",
+        status_sane: "SAN值",
+        act_check: "🎲 單次檢定",
+        act_batch: "🔥 瘋狂連發",
+        act_quick: "⚡ 快速通關",
+        act_quick_desc: "自動執行 (適合刷寶)",
+        act_manual: "🖐️ 沉浸體驗",
+        act_manual_desc: "手動決策 (RP模式)",
+        choice_run: "🏃 逃跑 (DEX)",
+        choice_hide: "🫣 躲藏 (LUK)",
+        choice_gaze: "👁️ 凝視 (POW)",
+        warn_loop: "⚠️ 輪迴之中... 請選擇",
+        history_title: "冒險履歷",
+        rank_title: "🏆 輪迴排行榜 (最深層數)",
+        claim_btn: "領取加班費",
+        claim_error: "🚫 系統錯誤：公司財務狀況不佳，暫停出金。",
+        intro_lines: [
+            "你是一名可憐加班的社畜，不知不覺已經到深夜......",
+            "當你回過神時，公司已經停電。",
+            "電梯毫無反應，你只好推開厚重的安全門，走向有綠色逃生標誌的樓梯間。",
+            "角落散落著一些遺落的方形薄款包裝袋。",
+            "灰塵味很重，你忍不住打了一個噴嚏——",
+            "「哈啾！」",
+            "......嘩啦。",
+            "身後的防火門重重地關上了。",
+            "因為太過昏暗，你已經找不到原本的門把手。",
+            "只好繼續往下走。",
+            "但有一種不祥的預感，正像墨水般在你心底蔓延......"
+        ],
+        outro_madness: [
+            "你的意識開始模糊...",
+            "樓梯間的牆壁開始蠕動，變成了老闆的臉。",
+            "「明天記得提早來開會...」",
+            "你放棄了思考。",
+            "你成為了這棟大樓結構的一部分。",
+            "永遠。"
+        ],
+        outro_escaped: [
+            "新鮮的空氣！",
+            "你推開了一樓的大門，警衛驚訝地看著你。",
+            "路燈昏黃，但至少是真實的。",
+            "你回頭看了一眼那棟漆黑的大樓。",
+            "「終於出來了...」",
+            "你看了看手機上的時間。",
+            "「該死，明天還是要來上班。」"
+        ]
+    },
+    en: {
+        title: "IOTA TRPG: Escape the Corporate Abyss",
+        subtitle: "Infinite Overtime Simulator on IOTA Chain",
+        recruit_btn: "+ Recruit Newbie",
+        list_title: "👥 Staff List",
+        status_mad: "💀 KIA (Overworked)",
+        status_sane: "Sanity",
+        act_check: "🎲 Single Check",
+        act_batch: "🔥 Batch Check",
+        act_quick: "⚡ Quick Run",
+        act_quick_desc: "Auto Play (Farming)",
+        act_manual: "🖐️ Immersive",
+        act_manual_desc: "Manual RP Mode",
+        choice_run: "🏃 Run (DEX)",
+        choice_hide: "🫣 Hide (LUK)",
+        choice_gaze: "👁️ Gaze (POW)",
+        warn_loop: "⚠️ In the Loop... Choose wisely",
+        history_title: "Adventure History",
+        rank_title: "🏆 Leaderboard (Max Depth)",
+        claim_btn: "Claim Salary",
+        claim_error: "🚫 System Error: Corporate insolvency. Withdrawals suspended.",
+        intro_lines: [
+            "You are a poor corporate slave, working overtime late into the night...",
+            "When you snap out of it, the power is out.",
+            "The elevator is dead. You push open the heavy safety door to the stairwell.",
+            "Empty candom wrappers are scattered in the corner.",
+            "The dust is thick. You sneeze—",
+            "\"Achoo!\"",
+            "...SLAM.",
+            "The fire door behind you slams shut.",
+            "It's too dark to find the handle.",
+            "You have no choice but to go down.",
+            "But an ominous feeling spreads in your heart like ink..."
+        ],
+        outro_madness: [
+            "Your consciousness begins to fade...",
+            "The walls of the stairwell start to writhe, turning into your boss's face.",
+            "\"Remember to come in early for the meeting tomorrow...\"",
+            "You stop thinking.",
+            "You become part of the building's structure.",
+            "Forever."
+        ],
+        outro_escaped: [
+            "Fresh air!",
+            "You push open the lobby door. The security guard looks at you in shock.",
+            "The streetlights are dim, but real.",
+            "You look back at the pitch-black building.",
+            "\"Finally out...\"",
+            "You check the time on your phone.",
+            "\"Damn it. I still have to work tomorrow.\""
+        ]
+    }
+};
+
+type Lang = 'zh' | 'en';
+
+export const processLog = (text: string, lang: Lang): string => {
+    if (!text) return "";
+    
+    // 如果是英文模式，直接回傳清理過的英文 (稍微美化)
+    if (lang === 'en') {
+        return text
+            .replace("=== Quick Investigation ===", "📜 [Quick Report]")
+            .replace("Escaped", "Escaped 🚪")
+            .replace("Looping", "Looping 🔄")
+            .replace("MADNESS", "MENTAL BREAKDOWN 💀");
+    }
+
+    // 中文模式：執行翻譯映射
+    let t = text;
+    // 標題
+    t = t.replace("=== Quick Investigation ===", "📜【快速調查報告】");
+    // 環境
+    t = t.replace("[Vision: Human Realm] Cold concrete stairs. Smell of rust. (Normal)", "👁️【幻覺】冰冷的逃生梯，牆上貼著「禁止堆放雜物」，空氣中有過勞的汗水味。")
+         .replace("[Vision: Deva Realm] Golden clouds. You feel peaceful. (CON+10)", "👁️【幻覺】樓梯間灑滿了午後的陽光，像是發薪日一樣令人安心。(體質+10)")
+         .replace("[Vision: Asura Realm] The walls bleed. War drums fuel rage. (DEX+5)", "👁️【幻覺】牆壁滲出紅墨水，耳邊傳來鍵盤敲擊的戰鼓聲，你感到莫名的暴躁。(敏捷+5)")
+         .replace("[Vision: Hungry Ghost Realm] Weeping faces grab your ankles. (DEX-10)", "👁️【幻覺】地面伸出無數蒼白的手（像是討債的客戶），試圖抓住你的腳踝。(敏捷-10)")
+         .replace("[Vision: Hell Realm] Absolute darkness. The Abyss stares back. (Stats -20)", "👁️【幻覺】絕對的黑暗。像是無止盡的加班地獄，深淵正在回望你。(全屬性大幅下降)");
+    // 快速結果
+    t = t.replace("> Rushed down successfully. Distance created.", "✅ 你跨過散落的文件夾，成功衝下樓梯。")
+         .replace("> Stumbled! The shadow catches up. (-2 SAN)", "❌ 你被電源線絆倒了！背後的腳步聲逼近。(SAN -2)")
+         .replace("Result: You escaped the stairwell. (+15 EXP)", "🎉【結局】你推開了逃生門...是新鮮空氣！(MIST +15)")
+         .replace("Result: The stairs loop back to the start. (Depth+1, SAN dmg)", "🔄【結局】你推開門...卻發現自己回到了公司的茶水間。鬼打牆了。(輪迴深度+1)")
+         .replace("Result: Mind Shattered.", "💀【結局】精神崩潰。你放棄了思考，成為了這棟大樓永遠的員工。");
+    // 手動劇情
+    t = t.replace("You step into the infinite stairwell...", "🚪 深夜停電的電梯誰敢搭，於是你踏入樓梯間...")
+         .replace("The air changes. What do you do?", "空氣變得凝重，日光燈管開始閃爍。你要怎麼做？")
+         .replace("You successfully evaded the shadow.", "✅ 你躲進了雜物堆，成功避開了那東西的巡視。")
+         .replace("You broke the loop and found the exit!", "🎉 你打破了加班的詛咒，找到了通往一樓的出口！")
+         .replace("FAILURE. The shadow grabs you...", "❌ 失敗。一隻冰冷的手搭上了你的肩膀...")
+         .replace("You fall down the stairs... and land back where you started. (Loop Depth +1)", "🔄 你滾落樓梯...抬頭一看，樓層牌依然寫著同樣的數字。(輪迴深度+1)")
+         .replace("Your mind cannot take another loop. It shatters.", "💀 你再也無法忍受了。你加入了祂們。")
+         .replace("You stared into the Abyss, and learned its secret. (Clue Found! SAN Restored)", "👁️ 你凝視著黑暗深處，看清了老闆的真面目。你洞悉了這間公司的秘密。(發現線索！SAN值恢復)");
+    // 通用
+    t = t.replace("Escaped", "打卡下班").replace("Looping", "無限加班").replace("MADNESS", "過勞死(精神崩潰)");
+    return t;
+};

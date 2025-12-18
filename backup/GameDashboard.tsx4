@@ -1,0 +1,260 @@
+"use client";
+
+import { useCurrentAccount, useSignAndExecuteTransaction, useIotaClient } from "@iota/dapp-kit";
+import { Transaction } from "@iota/iota-sdk/transactions";
+import { useState, useEffect, useRef } from "react"; // useRef 已經在這裡正確引入了
+import { toast } from "sonner";
+import { PACKAGE_ID, MODULE_NAME, RANDOM_OBJECT_ID } from "@/utils/constants";
+import { Globe, BookOpen, Gamepad2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+
+// --- 引入拆分後的元件 ---
+import { TEXTS, processLog, Lang } from "@/utils/localization";
+import { BGMPlayer } from "@/components/shared/BGMPlayer";
+import { CinematicText } from "@/components/shared/CinematicText";
+import { HistorySection } from "@/components/game/HistorySection";
+import { LeaderboardSection } from "@/components/game/LeaderboardSection";
+import { SimulationView } from "@/components/game/SimulationView";
+import { ResearchView } from "@/components/research/ResearchView";
+
+// Chart.js 註冊
+import {
+  Chart as ChartJS, RadialLinearScale, PointElement, LineElement, Filler, Tooltip, Legend, ArcElement, CategoryScale, LinearScale, BarElement
+} from 'chart.js';
+ChartJS.register(RadialLinearScale, PointElement, LineElement, Filler, Tooltip, Legend, ArcElement, CategoryScale, LinearScale, BarElement);
+
+// --- 冒險日誌覆蓋層 ---
+function AdventureOverlay({ logs, onClose, outcome, lang }: { logs: string[], onClose: (ended: boolean, outcome: string) => void, outcome: string, lang: Lang }) {
+    const [displayLogs, setDisplayLogs] = useState<string[]>([]);
+    const [currentIndex, setCurrentIndex] = useState(0);
+    const bottomRef = useRef<HTMLDivElement>(null);
+
+    // 文字逐行顯示效果
+    useEffect(() => {
+        if (currentIndex < logs.length) {
+            const timer = setTimeout(() => {
+                setDisplayLogs(prev => [...prev, processLog(logs[currentIndex], lang)]);
+                setCurrentIndex(prev => prev + 1);
+            }, 800);
+            return () => clearTimeout(timer);
+        }
+    }, [currentIndex, logs]);
+
+    // 自動捲動到底部
+    useEffect(() => {
+        bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    }, [displayLogs]);
+    
+    const isFinished = currentIndex >= logs.length;
+    const isFinalEnding = outcome === "MADNESS" || outcome === "Escaped" || outcome === "Madness";
+    
+    return (
+        <div className="fixed inset-0 z-50 bg-black/95 flex flex-col items-center justify-center p-6 animate-in fade-in duration-300">
+            <div className="max-w-2xl w-full h-[80vh] flex flex-col gap-4 border-x border-slate-800 bg-slate-950/50">
+                <div className="p-4 border-b border-slate-800 bg-slate-900">
+                    <h2 className="text-xl font-mono text-green-500 flex items-center gap-2">
+                        <span className="animate-pulse">●</span> TRPG LOG
+                    </h2>
+                </div>
+                <div className="flex-1 overflow-y-auto p-6 font-mono text-base space-y-4 custom-scrollbar">
+                    {displayLogs.map((log, idx) => (
+                        <div key={idx} className="border-l-2 border-slate-700 pl-4 py-2 animate-in slide-in-from-left-2 fade-in">
+                            <span className="text-slate-300">{log}</span>
+                        </div>
+                    ))}
+                    <div ref={bottomRef} />
+                </div>
+                {isFinished && (
+                    <div className="p-6 border-t border-slate-800 flex justify-center bg-slate-900">
+                        <Button onClick={() => onClose(isFinalEnding, outcome)} className="w-full max-w-sm bg-slate-100 text-black hover:bg-white font-bold text-lg h-12">
+                            {outcome === "Looping" ? "🔄 Continue" : "🚪 Close"}
+                        </Button>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
+
+// --- 主儀表板 ---
+export function GameDashboard() {
+  const account = useCurrentAccount();
+  const client = useIotaClient();
+  const { mutate: signAndExecuteTransaction } = useSignAndExecuteTransaction();
+
+  // State
+  const [lang, setLang] = useState<Lang>('zh'); 
+  const [activeTab, setActiveTab] = useState<'research' | 'simulation'>('research'); 
+  const [loading, setLoading] = useState(false);
+  const [investigators, setInvestigators] = useState<any[]>([]);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [adventureData, setAdventureData] = useState<any>(null);
+  const [showIntro, setShowIntro] = useState(true);
+  const [outroType, setOutroType] = useState<any>("none");
+  const [history, setHistory] = useState<any[]>([]);
+
+  // Load History
+  useEffect(() => {
+      const saved = localStorage.getItem("iota_trpg_history");
+      if (saved) {
+          try { setHistory(JSON.parse(saved)); } catch (e) {}
+      }
+  }, []);
+
+  const addToHistory = (logs: string[], outcome: string) => {
+      const newEntry = { timestamp: Date.now(), logs, outcome };
+      const newHistory = [...history, newEntry];
+      setHistory(newHistory);
+      localStorage.setItem("iota_trpg_history", JSON.stringify(newHistory));
+  };
+
+  const currentInvestigator = investigators.find(i => i.id === selectedId);
+  const t = TEXTS[lang]; 
+
+  // Fetch Logic
+  const fetchInvestigators = async () => {
+    if (!account) return;
+    const objects = await client.getOwnedObjects({ owner: account.address, options: { showType: true, showContent: true } });
+    const targetType = `${PACKAGE_ID}::${MODULE_NAME}::Investigator`;
+    const foundList = objects.data.filter((obj) => obj.data?.type === targetType).map((obj) => {
+        if (obj.data?.content?.dataType === "moveObject") {
+            // @ts-ignore
+            return { ...obj.data.content.fields, id: obj.data.objectId };
+        }
+        return null;
+    }).filter(Boolean);
+    setInvestigators(foundList);
+    if (!selectedId && foundList.length > 0) {
+        // @ts-ignore
+        const saneOne = foundList.find((i: any) => !i.is_mad);
+        // @ts-ignore
+        setSelectedId(saneOne ? saneOne.id : foundList[0].id);
+    }
+  };
+  useEffect(() => { fetchInvestigators(); }, [account]);
+
+  // Tx Helpers
+  const executeTx = (tx: Transaction, actionName: string) => {
+      tx.setGasBudget(50000000); 
+      signAndExecuteTransaction({ transaction: tx, options: { showEffects: true, showEvents: true } }, {
+          onSuccess: (result) => { setLoading(false); setTimeout(fetchInvestigators, 1000); toast.success("Success"); },
+          onError: (err) => { toast.error(err.message); setLoading(false); }
+      });
+  };
+
+  const executeScenarioTx = async (tx: Transaction) => {
+      setLoading(true);
+      tx.setGasBudget(100000000); 
+      signAndExecuteTransaction({ transaction: tx, options: { showEffects: true, showEvents: true } }, {
+          onSuccess: async (result) => {
+              let events = result.events || [];
+              if (events.length === 0) {
+                  await new Promise(r => setTimeout(r, 2000));
+                  try {
+                      const r = await client.getTransactionBlock({ digest: result.digest, options: { showEvents: true, showEffects: true } });
+                      events = r.events || [];
+                  } catch (e) {}
+              }
+              const event = events.find(e => e.type.includes("ScenarioEvent"));
+              if (event) {
+                  // @ts-ignore
+                  const logs = event.parsedJson?.logs || [];
+                  // @ts-ignore
+                  const outcome = event.parsedJson?.outcome || "";
+                  setAdventureData({ logs, outcome });
+                  addToHistory(logs, outcome);
+              }
+              setLoading(false);
+          },
+          onError: (e) => { toast.error(e.message); setLoading(false); }
+      });
+  };
+  
+  // Game Actions
+  const mint = () => {
+      const tx = new Transaction();
+      tx.moveCall({ target: `${PACKAGE_ID}::${MODULE_NAME}::mint`, arguments: [ tx.object(RANDOM_OBJECT_ID), tx.pure.vector("u8", Array.from(new TextEncoder().encode("Staff #" + Math.floor(Math.random()*9000+1000)))) ] });
+      // Mint 成功後重新播放前言
+      signAndExecuteTransaction({ transaction: tx, options: { showEffects: true, showEvents: true } }, {
+          onSuccess: () => { setLoading(false); setTimeout(fetchInvestigators, 1000); setShowIntro(true); },
+          onError: (err) => { toast.error(err.message); setLoading(false); }
+      });
+  };
+
+  const sanityCheck = () => { if(!currentInvestigator)return; const tx = new Transaction(); tx.moveCall({target:`${PACKAGE_ID}::${MODULE_NAME}::sanity_check`,arguments:[tx.object(currentInvestigator.id),tx.object(RANDOM_OBJECT_ID)]}); executeTx(tx, "Check"); };
+  const batchSanityCheck = () => { if(!currentInvestigator)return; const tx = new Transaction(); tx.moveCall({target:`${PACKAGE_ID}::${MODULE_NAME}::batch_sanity_check`,arguments:[tx.object(currentInvestigator.id),tx.object(RANDOM_OBJECT_ID)]}); executeTx(tx, "Batch"); };
+  const playQuick = () => { if(!currentInvestigator)return; const tx = new Transaction(); tx.moveCall({target:`${PACKAGE_ID}::${MODULE_NAME}::play_stairs_quick`,arguments:[tx.object(currentInvestigator.id),tx.object(RANDOM_OBJECT_ID)]}); executeScenarioTx(tx); };
+  const playManualStart = () => { if(!currentInvestigator)return; const tx = new Transaction(); tx.moveCall({target:`${PACKAGE_ID}::${MODULE_NAME}::manual_start`,arguments:[tx.object(currentInvestigator.id),tx.object(RANDOM_OBJECT_ID)]}); executeScenarioTx(tx); };
+  const playManualAction = (c:number) => { if(!currentInvestigator)return; const tx = new Transaction(); tx.moveCall({target:`${PACKAGE_ID}::${MODULE_NAME}::manual_resolve`,arguments:[tx.object(currentInvestigator.id),tx.object(RANDOM_OBJECT_ID),tx.pure.u8(c)]}); executeScenarioTx(tx); };
+  
+  const getImageUrl = (inv: any) => inv?.is_mad ? "/images/madness.png" : "/images/investigator.png";
+
+  // 🔥 背景切換邏輯 (使用高對比配色)
+  const bgGradient = activeTab === 'simulation' 
+    ? "from-red-950/90 via-slate-950 to-black" // Game: 恐怖深紅
+    : "from-sky-900/50 via-slate-900 to-black"; // Research: 科技深藍
+
+  return (
+    <div className="min-h-screen text-slate-100 font-sans selection:bg-indigo-500/30 transition-all duration-700">
+      {/* 🌌 動態背景層 */}
+      <div className={`fixed inset-0 z-[-1] bg-slate-950`}>
+          <div className={`absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] ${bgGradient} transition-all duration-1000 ease-in-out`}></div>
+          <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px)', backgroundSize: '40px 40px' }}></div>
+      </div>
+
+      <BGMPlayer />
+      
+      {/* 頂部導航列 */}
+      <nav className="sticky top-0 z-40 w-full border-b border-slate-800 bg-slate-950/80 backdrop-blur-md px-6 py-3 flex justify-between items-center shadow-lg">
+          <div className="flex items-center gap-3">
+              <div className="w-8 h-8 bg-gradient-to-br from-indigo-600 to-violet-600 rounded flex items-center justify-center font-bold text-white shadow-lg">C</div>
+              <span className="font-bold tracking-wider text-slate-200 hidden md:inline">Project Cthulhu-Fi</span>
+          </div>
+          
+          <div className="flex bg-slate-800/50 p-1 rounded-lg border border-slate-700">
+              <button onClick={() => setActiveTab('research')} className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-medium transition-all ${activeTab === 'research' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}>
+                  <BookOpen size={16} /> Research
+              </button>
+              <button onClick={() => setActiveTab('simulation')} className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-medium transition-all ${activeTab === 'simulation' ? 'bg-red-700 text-white shadow-lg' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}>
+                  <Gamepad2 size={16} /> Simulation
+              </button>
+          </div>
+
+          <Button variant="ghost" size="sm" onClick={() => setLang(l => l === 'zh' ? 'en' : 'zh')} className="text-slate-400 hover:text-white">
+              <Globe size={18} />
+          </Button>
+      </nav>
+
+      {/* 內容區 */}
+      <main className="relative">
+          {activeTab === 'research' ? (
+              <ResearchView />
+          ) : (
+              <>
+                  {showIntro && <CinematicText lines={t.intro_lines} onComplete={() => setShowIntro(false)} />}
+                  {outroType !== "none" && <CinematicText lines={outroType==="madness"?t.outro_madness:t.outro_escaped} onComplete={() => setOutroType("none")} isMadness={outroType==="madness"} />}
+                  {adventureData && <AdventureOverlay logs={adventureData.logs} outcome={adventureData.outcome} lang={lang} onClose={(ended: boolean, outcome: string) => { setAdventureData(null); fetchInvestigators(); if (ended) setOutroType(outcome.toLowerCase().includes("mad")?"madness":"escaped"); }} />}
+                  
+                  <div className="max-w-6xl mx-auto mt-8 px-4 pb-20 animate-in fade-in zoom-in-95 duration-500">
+                      <div className="text-center mb-8">
+                          <h1 className="text-4xl md:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-indigo-600 font-serif tracking-widest uppercase mb-2">{t.title}</h1>
+                          <p className="text-slate-500 text-sm tracking-widest">{t.subtitle}</p>
+                      </div>
+
+                      <SimulationView 
+                          account={account} investigators={investigators} currentInvestigator={currentInvestigator} loading={loading} t={t}
+                          mint={mint} sanityCheck={sanityCheck} batchSanityCheck={batchSanityCheck} playQuick={playQuick} playManualStart={playManualStart} playManualAction={playManualAction}
+                          setSelectedId={setSelectedId} getImageUrl={getImageUrl} lang={lang}
+                      />
+
+                      <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <HistorySection history={history} lang={lang} />
+                          <LeaderboardSection client={client} lang={lang} />
+                      </div>
+                  </div>
+              </>
+          )}
+      </main>
+    </div>
+  );
+}
