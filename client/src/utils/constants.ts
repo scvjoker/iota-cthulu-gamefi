@@ -1,5 +1,5 @@
 // 這是剛剛部署得到的 Package ID
-export const PACKAGE_ID = "0x7981e1a673513c1ac47e523e58b6aaa37a378c6bc7861c7640a7db53797764d9";
+export const PACKAGE_ID = "0xa42fd9753810179c2d4dee5b2d3b832eefd5769658ea5d1a333247e68d983af2";
 
 // 模組名稱 (Move 檔案裡的 module name)
 export const MODULE_NAME = "investigator";

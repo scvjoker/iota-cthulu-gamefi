@@ -1,7 +1,11 @@
 {
   "compilerOptions": {
     "target": "ES2017",
-    "lib": ["dom", "dom.iterable", "esnext"],
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "esnext"
+    ],
     "allowJs": true,
     "skipLibCheck": true,
     "strict": true,
@@ -19,16 +23,34 @@
       }
     ],
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": [
+        "./src/*"
+      ]
     }
   },
   "include": [
     "next-env.d.ts",
     "**/*.ts",
     "**/*.tsx",
+    ".next1/types/**/*.ts",
+    ".next1/dev/types/**/*.ts",
+    "**/*.mts",
+    "src/app/page.tsxold",
+    "src/components/oldversion/GameDashboard.tsx1",
+    "src/components/oldversion/GameDashboard.tsx2",
+    "src/components/GameDashboard.tsx3",
+    "src/components/GameDashboard.tsx4",
+    "src/components/oldversion/page.tsx1",
+    "src/components/GameDashboard.tsx5",
+    "src/components/game/HistorySection.tsxold",
+    "src/components/GameDashboard.tsx6",
+    "src/components/oldversion/localization.ts1",
+    "src/components/GameDashboard.tsx7",
+    "src/components/game/SimulationView.tsx1",
     ".next/types/**/*.ts",
-    ".next/dev/types/**/*.ts",
-    "**/*.mts"
-, "src/app/page.tsxold"  ],
-  "exclude": ["node_modules"]
+    ".next/dev/types/**/*.ts"
+, "src/components/oldversion/GameDashboard.tsx8", "src/components/oldversion/GameDashboard.tsx9"  ],
+  "exclude": [
+    "node_modules"
+  ]
 }
