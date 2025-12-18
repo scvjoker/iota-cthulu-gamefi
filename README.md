@@ -1,4 +1,4 @@
-```markdown
+
 # 🐙 Project Cthulhu-Fi: IOTA Workshop DEMO Project
 
 [![Deployed on Vercel](https://img.shields.io/badge/Vercel-Deployed-000000?style=for-the-badge&logo=vercel&logoColor=white)](https://iota-cthulu-gamefi-ma82.vercel.app/)
